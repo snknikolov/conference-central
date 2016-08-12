@@ -1,6 +1,7 @@
 package com.google.devrel.training.conference.spi;
 
 import static com.google.devrel.training.conference.service.OfyService.ofy;
+import static com.google.devrel.training.conference.service.OfyService.factory;
 
 import com.google.api.server.spi.config.Api;
 import com.google.api.server.spi.config.ApiMethod;
@@ -8,7 +9,9 @@ import com.google.api.server.spi.config.ApiMethod.HttpMethod;
 import com.google.api.server.spi.response.UnauthorizedException;
 import com.google.appengine.api.users.User;
 import com.google.devrel.training.conference.Constants;
+import com.google.devrel.training.conference.domain.Conference;
 import com.google.devrel.training.conference.domain.Profile;
+import com.google.devrel.training.conference.form.ConferenceForm;
 import com.google.devrel.training.conference.form.ProfileForm;
 import com.google.devrel.training.conference.form.ProfileForm.TeeShirtSize;
 import com.googlecode.objectify.Key;
@@ -91,6 +94,60 @@ public class ConferenceApi {
         String userId = user.getUserId();
         Key<Profile> key = Key.create(Profile.class, userId);
         Profile profile = ofy().load().key(key).now();
+        return profile;
+    }
+    
+    /**
+     * 
+     * @param user 
+     *          The user who creates/updates the conference.
+     * @param form 
+     *          A ProfileForm object sent from the client form.
+     * @return Conference 
+     *          The object just created.
+     * @throws UnauthorizedException 
+     *          If user object is null.
+     */
+    @ApiMethod(name="createConference", path="conference", httpMethod=HttpMethod.POST)
+    public Conference createConference(final User user, final ConferenceForm form)
+        throws UnauthorizedException {
+        
+        if (user == null) {
+            throw new UnauthorizedException("Authorization required.");
+        }
+                
+        // Get user's id, entity key and profile.
+        String userId = user.getUserId();
+        Key<Profile> profileKey = Key.create(Profile.class, userId);
+        Profile profile = getProfileFromUser(user);
+
+        // Generate a key and create a new conference entity.
+        Key<Conference> conferenceKey = factory().allocateId(profileKey, Conference.class);
+        Conference conf = new Conference(conferenceKey.getId(), userId, form);
+//        conf.updateWithConferenceForm(form);
+        
+        ofy().save().entities(conf, profile).now();
+
+        return conf;
+    }
+    
+    /**
+     * Get Profile entity from User object.
+     * Create one if there is no entity for this user.
+     * @param user
+     * @return
+     */
+    private static Profile getProfileFromUser(User user) {
+        Key<Profile> key = Key.create(Profile.class, user.getUserId());
+        Profile profile = ofy().load().key(key).now();
+        
+        if (profile == null) {
+            String email = user.getEmail();
+            profile = new Profile(user.getUserId(),
+                                extractDefaultDisplayNameFromEmail(email),
+                                email,
+                                TeeShirtSize.NOT_SPECIFIED);
+        }
         return profile;
     }
     

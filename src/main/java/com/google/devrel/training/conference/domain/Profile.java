@@ -51,7 +51,7 @@ public class Profile {
 	        this.teeShirtSize = teeShirtSize;
 	}
 	
-    @SuppressWarnings("unused")
+	
+	@SuppressWarnings("unused")
     private Profile() {}
-
 }
