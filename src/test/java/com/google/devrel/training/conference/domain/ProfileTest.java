@@ -63,13 +63,13 @@ public class ProfileTest {
         assertEquals(newTeeShirtSize, profile.getTeeShirtSize());
     }
 
-//    @Test
-//    public void testListValues() throws Exception {
-//        List<String> conferenceKeys = new ArrayList<>();
-//        assertEquals(conferenceKeys, profile.getConferenceKeysToAttend());
-//        Key<Conference> conferenceKey = Key.create(Conference.class, 123L);
-//        profile.addToConferenceKeysToAttend(conferenceKey.getString());
-//        conferenceKeys.add(conferenceKey.getString());
-//        assertEquals(conferenceKeys, profile.getConferenceKeysToAttend());
-//    }
+    @Test
+    public void testListValues() throws Exception {
+        List<String> conferenceKeys = new ArrayList<>();
+        assertEquals(conferenceKeys, profile.getConferenceKeysToAttend());
+        Key<Conference> conferenceKey = Key.create(Conference.class, 123L);
+        profile.addToConferenceKeysToAttend(conferenceKey.getString());
+        conferenceKeys.add(conferenceKey.getString());
+        assertEquals(conferenceKeys, profile.getConferenceKeysToAttend());
+    }
 }
