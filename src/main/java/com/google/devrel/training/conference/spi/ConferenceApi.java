@@ -19,6 +19,9 @@ import com.googlecode.objectify.Work;
 import com.googlecode.objectify.cmd.Query;
 import com.google.appengine.api.memcache.MemcacheService;
 import com.google.appengine.api.memcache.MemcacheServiceFactory;
+import com.google.appengine.api.taskqueue.Queue;
+import com.google.appengine.api.taskqueue.QueueFactory;
+import com.google.appengine.api.taskqueue.TaskOptions;
 import com.google.appengine.api.users.User;
 
 import static com.google.devrel.training.conference.service.OfyService.ofy;
@@ -132,18 +135,30 @@ public class ConferenceApi {
         if (user == null) {
             throw new UnauthorizedException("Authorization required.");
         }
-                
         // Get user's id, entity key and profile.
-        String userId = user.getUserId();
+        final String userId = user.getUserId();
         Key<Profile> profileKey = Key.create(Profile.class, userId);
-        Profile profile = getProfileFromUser(user);
+        final Profile profile = getProfileFromUser(user);
+        final Queue queue = QueueFactory.getDefaultQueue();
+        final Key<Conference> conferenceKey = factory().allocateId(profileKey, Conference.class);
 
-        // Generate a key and create a new conference entity.
-        Key<Conference> conferenceKey = factory().allocateId(profileKey, Conference.class);
-        Conference conf = new Conference(conferenceKey.getId(), userId, form);
+                
+        Conference conf = ofy().transact(new Work<Conference>() {
+            public Conference run() {
+                // Generate a key and create a new conference entity.
+                Conference conf = new Conference(conferenceKey.getId(), userId, form);
+                ofy().save().entities(conf, profile).now();
+                
+                // Add send confirmation email task to push queue.
+                queue.add(ofy().getTransaction(), TaskOptions.Builder
+                                     .withUrl("/tasks/send_confirmation_email")
+                                     .param("email", profile.getMainEmail())
+                                     .param("conferenceInfo", conf.toString()));
+
+                return conf;
+            }
+        });
         
-        ofy().save().entities(conf, profile).now();
-
         return conf;
     }
     
