@@ -15,7 +15,7 @@ public class Profile {
 	private String displayName;
 	private String mainEmail;
 	private TeeShirtSize teeShirtSize;
-	private final List<String> conferencesKeysToAttend = new ArrayList<>(0);
+	private List<String> conferencesKeysToAttend = new ArrayList<>(0);
 
 	@Id private String userId;
     

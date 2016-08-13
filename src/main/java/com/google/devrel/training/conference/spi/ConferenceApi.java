@@ -219,15 +219,11 @@ public class ConferenceApi {
         WrappedBoolean result = ofy().transact(new Work<WrappedBoolean>() {
            public WrappedBoolean run() {
                try {
-                   Conference conference = getConference(websafeConferenceKey);
-                   if (conference == null) {
-                       return new WrappedBoolean(false, "Conference not found: " + websafeConferenceKey);
-                   }
-                   
+                   Conference conference = getConference(websafeConferenceKey);                   
                    Profile profile = getProfileFromUser(user);
-                   
+
                    if (profile.getConferenceKeysToAttend().contains(websafeConferenceKey)) {
-                       return new WrappedBoolean(false, "Already registered");
+                       return new WrappedBoolean(false, "Already registered.");
                    } else if (conference.getSeatsAvailable() <= 0) {
                        return new WrappedBoolean(false, "No seats left.");
                    } else {
@@ -274,11 +270,7 @@ public class ConferenceApi {
         WrappedBoolean result = ofy().transact(new Work<WrappedBoolean>() {
             public WrappedBoolean run() {
                 try {
-                    Conference conference = getConference(websafeConferenceKey);
-                    if (conference == null) {
-                        return new WrappedBoolean(false, "Conference not found: " + websafeConferenceKey);
-                    }
-                    
+                    Conference conference = getConference(websafeConferenceKey);                    
                     Profile profile = getProfileFromUser(user);
                     
                     if (!profile.getConferenceKeysToAttend().contains(websafeConferenceKey)) {
