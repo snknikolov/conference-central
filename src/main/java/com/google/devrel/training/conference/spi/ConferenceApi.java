@@ -17,13 +17,15 @@ import com.google.api.server.spi.response.UnauthorizedException;
 import com.googlecode.objectify.Key;
 import com.googlecode.objectify.Work;
 import com.googlecode.objectify.cmd.Query;
-
+import com.google.appengine.api.memcache.MemcacheService;
+import com.google.appengine.api.memcache.MemcacheServiceFactory;
 import com.google.appengine.api.users.User;
 
 import static com.google.devrel.training.conference.service.OfyService.ofy;
 import static com.google.devrel.training.conference.service.OfyService.factory;
 
 import com.google.devrel.training.conference.Constants;
+import com.google.devrel.training.conference.domain.Announcement;
 import com.google.devrel.training.conference.domain.Conference;
 import com.google.devrel.training.conference.domain.Profile;
 import com.google.devrel.training.conference.form.ConferenceForm;
@@ -353,6 +355,15 @@ public class ConferenceApi {
             throw new NotFoundException("No conference found with key: " + websafeConferenceKey);
         }
         return conference;
+    }
+    
+    @ApiMethod(name="getAnnouncement", path="announcement", httpMethod=HttpMethod.GET)
+    public Announcement getAnnouncement() {
+        MemcacheService memcacheService = MemcacheServiceFactory.getMemcacheService();
+        Object announcement = memcacheService.get(Constants.MEMCACHE_ANNOUNCEMENTS_KEY);
+        
+        return announcement == null ? 
+                null : new Announcement(announcement.toString());
     }
         
     /**
