@@ -141,14 +141,13 @@ public class ConferenceApi {
         final Profile profile = getProfileFromUser(user);
         final Queue queue = QueueFactory.getDefaultQueue();
         final Key<Conference> conferenceKey = factory().allocateId(profileKey, Conference.class);
-
                 
         Conference conf = ofy().transact(new Work<Conference>() {
             public Conference run() {
                 // Generate a key and create a new conference entity.
                 Conference conf = new Conference(conferenceKey.getId(), userId, form);
                 ofy().save().entities(conf, profile).now();
-                
+
                 // Add send confirmation email task to push queue.
                 queue.add(ofy().getTransaction(), TaskOptions.Builder
                                      .withUrl("/tasks/send_confirmation_email")
@@ -158,10 +157,14 @@ public class ConferenceApi {
                 return conf;
             }
         });
-        
         return conf;
     }
     
+    /**
+     * Get a list of all conferences created.
+     * @param queryForm
+     * @return
+     */
     @ApiMethod(name="queryConferences", path="queryConferences", httpMethod = HttpMethod.POST)
     public List<Conference> queryConferences(final ConferenceQueryForm queryForm) {
         Query<Conference> query = queryForm.getQuery();
@@ -179,6 +182,12 @@ public class ConferenceApi {
         return result;
     }
     
+    /**
+     * Get conferences created by a user.
+     * @param user The user who invokes this method, null when not not signed in.
+     * @return List of Conference objects created by user.
+     * @throws UnauthorizedException If user is null
+     */
     @ApiMethod(name="getConferencesCreated", path="getConferencesCreated", httpMethod = HttpMethod.POST)
     public List<Conference> getConferencesCreated(final User user) 
         throws UnauthorizedException {
@@ -272,6 +281,18 @@ public class ConferenceApi {
         return result;
     }
     
+    /**
+     * Unregister from a conference.
+     * @param user The user who invokes this method, null when not not signed in.
+     * @param websafeConferenceKey String representation of Conference key.
+     * 
+     * @return Boolean true if unregistered successfully, false otherwise.
+     * 
+     * @throws UnauthorizedException When user is not signed in.
+     * @throws NotFoundException When there is no conference with this key.
+     * @throws ForbiddenException
+     * @throws ConflictException When user is not registered for conference with this key.
+     */
     @ApiMethod(name="unregisterFromConference",
             path="conference/websafeConferenceKey/registration",
             httpMethod = HttpMethod.DELETE

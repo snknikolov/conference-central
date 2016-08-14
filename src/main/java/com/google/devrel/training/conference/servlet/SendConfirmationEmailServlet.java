@@ -29,7 +29,7 @@ public class SendConfirmationEmailServlet extends HttpServlet {
             Logger.getLogger(SendConfirmationEmailServlet.class.getName());
     
     @Override
-    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+    protected void doPost(HttpServletRequest request, HttpServletResponse response)
         throws ServletException, IOException {
         String email = request.getParameter("email");
         String conferenceInfo = request.getParameter("conferenceInfo");
@@ -48,8 +48,6 @@ public class SendConfirmationEmailServlet extends HttpServlet {
                     new InternetAddress(email, ""));
             message.setSubject("You created a new conference");
             message.setText(body);
-            LOG.log(Level.INFO, String.format("Email: %s\nBody: %s", email, body));
-            System.out.println(String.format("Email: %s\nBody: %s", email, body));
             Transport.send(message);
         } catch (MessagingException me) {
             LOG.log(Level.WARNING, String.format("Failed to send an mail to %s", email), me);
