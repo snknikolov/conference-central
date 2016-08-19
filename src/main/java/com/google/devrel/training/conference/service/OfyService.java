@@ -1,5 +1,6 @@
 package com.google.devrel.training.conference.service;
 
+import com.google.devrel.training.conference.domain.Session;
 import com.google.devrel.training.conference.domain.Conference;
 import com.google.devrel.training.conference.domain.Profile;
 import com.googlecode.objectify.Objectify;
@@ -16,6 +17,7 @@ public class OfyService {
     static {
         factory().register(Profile.class);
         factory().register(Conference.class);
+        factory().register(Session.class);
     }
 
     /**

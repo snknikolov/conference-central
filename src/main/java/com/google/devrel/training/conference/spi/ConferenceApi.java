@@ -31,10 +31,13 @@ import com.google.devrel.training.conference.Constants;
 import com.google.devrel.training.conference.domain.Announcement;
 import com.google.devrel.training.conference.domain.Conference;
 import com.google.devrel.training.conference.domain.Profile;
+import com.google.devrel.training.conference.domain.Session;
+import com.google.devrel.training.conference.domain.Session.SessionType;
 import com.google.devrel.training.conference.form.ConferenceForm;
 import com.google.devrel.training.conference.form.ConferenceQueryForm;
 import com.google.devrel.training.conference.form.ProfileForm;
 import com.google.devrel.training.conference.form.ProfileForm.TeeShirtSize;
+import com.google.devrel.training.conference.form.SessionForm;
 
 /**
  * Defines conference APIs.
@@ -57,9 +60,8 @@ public class ConferenceApi {
      * @return Profile object just created.
      * @throws UnauthorizedException
      *             when the User object is null.
-     */
-
-    /** Declare this method as a method available externally through Endpoints
+     *
+     *  Declare this method as a method available externally through Endpoints
      *  The request that invokes this method should provide data that
      *  conforms to the fields defined in ProfileForm
      */
@@ -204,19 +206,7 @@ public class ConferenceApi {
         
         return query.list();
     }
-    
-    public List<Conference> playgroundFilter() {
-        return ofy().load()
-                    .type(Conference.class)
-                    .filter("city =", "Tokyo")
-                    .filter("seatsAvailable >", 0)
-                    .filter("seatsAvailable <", 10)
-                    .order("seatsAvailable")
-                    .order("name")
-                    .order("date")
-                    .list();
-    }
-    
+        
     /**
      * Register to attend a conference.
      * @param user The user who invokes this method, null when not not signed in.
@@ -335,7 +325,6 @@ public class ConferenceApi {
                 throw new ForbiddenException("Unknown exception.");
             }
         }
-
         return result;
     }
  
@@ -393,6 +382,105 @@ public class ConferenceApi {
         return conference;
     }
     
+    /**
+     * Create a session for a Conference.
+     * @param sessionForm A SessionForm object sent from the client form.
+     * @param websafeConferenceKey The Conference's websafe key.
+     * @return The object just created.
+     * @throws UnauthorizedException
+     * @throws NotFoundException
+     */
+    @ApiMethod(name="createSession", path="session/new", httpMethod = HttpMethod.POST)
+    public Session createSession(final User user,
+            final SessionForm sessionForm, 
+            @Named("websafeConferenceKey") final String websafeConferenceKey) 
+            throws UnauthorizedException, NotFoundException {
+        if (user == null) {
+            throw new UnauthorizedException("Authorization required.");
+        }
+        
+        Conference conference = getConference(websafeConferenceKey);
+        final long conferenceId = conference.getId();
+        final Key<Conference> conferenceKey = Key.create(Conference.class, conferenceId);
+        
+        final Key<Session> sessionKey = factory().allocateId(conferenceKey, Session.class);
+        Session session = new Session(sessionKey.getId(), conferenceId, sessionForm);
+        ofy().save().entities(conference, session).now();
+        
+        return session;
+    }
+        
+    /**
+     * Return all sessions for a conference with given key.
+     * @param websafeConferenceKey Conference's key
+     * @return
+     * @throws NotFoundException If there is no conference with the given key.
+     */
+    @ApiMethod(name="getConferenceSessions",
+            path="getConferenceSessions",
+            httpMethod = HttpMethod.POST)
+    public List<Session> getConferenceSessions(
+            @Named("websafeConferenceKey") final String websafeConferenceKey)
+            throws NotFoundException {
+        // TODO Fix conference query by key.
+        Key<Conference> key = Key.create(websafeConferenceKey);
+        Conference c = getConference(websafeConferenceKey);
+        Key<Conference> cKey = Key.create(Conference.class, c.getId());
+
+        if (ofy().load().key(key).now() == null) {
+            throw new NotFoundException("No conference found with key: " + key.toString());
+        }
+        
+        Query<Session> query = ofy().load()
+                                    .type(Session.class)
+                                    .ancestor(cKey)
+                                    .order("speaker");
+
+        return query.list();
+    }
+        
+    /**
+     * Filter conference sessions by type. The method calls getConferenceSessions.
+     * @param websafeConferenceKey
+     * @param typeOfSession
+     * @return
+     * @throws NotFoundException
+     */
+    @ApiMethod(name="getConferenceSessionsByType",
+            path="byType",
+            httpMethod = HttpMethod.POST)
+    public List<Session> getConferenceSessionsByType(
+            @Named("websafeConferenceKey") final String websafeConferenceKey, 
+            @Named("sessionType") final SessionType typeOfSession) throws NotFoundException {
+        List<Session> allSessions = getConferenceSessions(websafeConferenceKey);
+        List<Session> filteredSessions = new ArrayList<>();
+        for (Session session : allSessions) {
+            if (session.getType() == typeOfSession) {
+                filteredSessions.add(session);
+            }
+        }
+        return filteredSessions;
+    }
+    
+    /**
+     * Get all sessions by speaker.
+     * @param speaker Speaker's name as String.
+     * @return List of all sessions by speaker. Empty list if no sessions by speaker.
+     */
+    @ApiMethod(name="getSessionsBySpeaker",
+            path="getSessionsBySpeaker/{speaker}",
+            httpMethod = HttpMethod.POST)
+    public List<Session> getSessionsBySpeaker(@Named("speaker") String speaker) {
+        Query<Session> query = ofy().load()
+                                    .type(Session.class)
+                                    .filter("speaker =", speaker);
+        return query.list();
+    }
+    
+    /**
+     * Get announcements from memcache (if any).
+     * @return Announcement object if there are announcements, null otherwise.
+     */
     @ApiMethod(name="getAnnouncement", path="announcement", httpMethod=HttpMethod.GET)
     public Announcement getAnnouncement() {
         MemcacheService memcacheService = MemcacheServiceFactory.getMemcacheService();
