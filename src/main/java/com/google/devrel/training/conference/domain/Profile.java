@@ -17,6 +17,7 @@ public class Profile {
 	private String mainEmail;
 	private TeeShirtSize teeShirtSize;
 	private List<String> conferencesKeysToAttend = new ArrayList<>(0);
+	private List<String> sessionsKeysWishlist = new ArrayList<>(0);
 
 	@Id private String userId;
     
@@ -59,6 +60,22 @@ public class Profile {
             conferencesKeysToAttend.remove(key);
         } else {
             throw new IllegalArgumentException("Conference key not found: " + key);
+        }
+    }
+    
+    public List<String> getSessionKeysWishlist() {
+        return ImmutableList.copyOf(sessionsKeysWishlist);
+    }
+    
+    public void addToSessionKeysWishlist(String key) {
+        sessionsKeysWishlist.add(key);
+    }
+    
+    public void deleteSessionInWishlist(String key) {
+        if (sessionsKeysWishlist.contains(key)) {
+            sessionsKeysWishlist.remove(key);
+        } else {
+            throw new IllegalArgumentException("Session key not found: " + key);
         }
     }
 	

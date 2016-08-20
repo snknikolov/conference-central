@@ -383,23 +383,24 @@ public class ConferenceApi {
     }
     
     /**
-     * Create a session for a Conference.
+     * Create a session for a Conference. Only the user who created the conference
+     * can add sessions to it.
      * @param sessionForm A SessionForm object sent from the client form.
-     * @param websafeConferenceKey The Conference's websafe key.
+     * @param websafeConferenceKey String representation of Conference key.
      * @return The object just created.
-     * @throws UnauthorizedException
-     * @throws NotFoundException
+     * @throws UnauthorizedException When user is not signed in or is not the original Conference creator.
+     * @throws NotFoundException When no Conference with this key is found.
      */
     @ApiMethod(name="createSession", path="session/new", httpMethod = HttpMethod.POST)
     public Session createSession(final User user,
             final SessionForm sessionForm, 
             @Named("websafeConferenceKey") final String websafeConferenceKey) 
             throws UnauthorizedException, NotFoundException {
-        if (user == null) {
+        Conference conference = getConference(websafeConferenceKey);
+        if (user == null || !user.getUserId().equals(conference.getOrganizerUserId())) {
             throw new UnauthorizedException("Authorization required.");
         }
         
-        Conference conference = getConference(websafeConferenceKey);
         final long conferenceId = conference.getId();
         final Key<Conference> conferenceKey = Key.create(Conference.class, conferenceId);
         
@@ -412,8 +413,8 @@ public class ConferenceApi {
         
     /**
      * Return all sessions for a conference with given key.
-     * @param websafeConferenceKey Conference's key
-     * @return
+     * @param websafeConferenceKey String representation of Conference key.
+     * @return List of all sessions for a Conference with this key.
      * @throws NotFoundException If there is no conference with the given key.
      */
     @ApiMethod(name="getConferenceSessions",
@@ -441,10 +442,10 @@ public class ConferenceApi {
         
     /**
      * Filter conference sessions by type. The method calls getConferenceSessions.
-     * @param websafeConferenceKey
-     * @param typeOfSession
+     * @param websafeConferenceKey String representation of Conference key.
+     * @param typeOfSession The type of session to query for.
      * @return
-     * @throws NotFoundException
+     * @throws NotFoundException When there is no Conference with this key.
      */
     @ApiMethod(name="getConferenceSessionsByType",
             path="byType",
@@ -475,6 +476,152 @@ public class ConferenceApi {
                                     .type(Session.class)
                                     .filter("speaker =", speaker);
         return query.list();
+    }
+        
+    /**
+     * Add a session to user's wish list.
+     * @param user The user who invokes this method, null when not signed in.
+     * @param websafeSessionKey String representation of Session key.
+     * 
+     * @return WrappedBoolean true if added successfully, false otherwise.
+     * 
+     * @throws UnauthorizedException When user is not signed in.
+     * @throws NotFoundException When there is no session with this key.
+     * @throws ForbiddenException
+     * @throws ConflictException When user has already added session to wish list.
+     */
+    @ApiMethod(name="addSessionToWishlist", 
+            path="session/{websafeSessionKey}/wishlist",
+            httpMethod = HttpMethod.PUT)
+    public WrappedBoolean addSessionToWishList(final User user, 
+            @Named("websafeSessionKey") final String websafeSessionKey) 
+            throws UnauthorizedException, NotFoundException, 
+                ForbiddenException, ConflictException {
+        if (user == null) {
+            throw new UnauthorizedException("Authorization required.");
+        }
+        
+        WrappedBoolean result = ofy().transact(new Work<WrappedBoolean>() {
+           public WrappedBoolean run()  {
+               try {
+                   Profile profile = getProfileFromUser(user);
+                   // Check if session with key exists. Throws NotFoundException if it doesn't.
+                   Session session = getSession(websafeSessionKey);
+                   
+                   if (profile.getSessionKeysWishlist().contains(websafeSessionKey)) {
+                       return new WrappedBoolean(false, "Session already in wishlist.");
+                   } else {
+                       profile.addToSessionKeysWishlist(websafeSessionKey);
+                       ofy().save().entity(profile).now();
+                       return new WrappedBoolean(true, "Successfully added to wishlist.");
+                   }
+               } catch (NotFoundException nfe) {
+                   return new WrappedBoolean(false, "No session found with key: " + websafeSessionKey);
+               } catch (Exception e) {
+                   return new WrappedBoolean(false, "Unknown exception.");
+               }
+           }
+        });
+        
+        if (!result.getResult()) {
+            if (result.getReason().equals("Session already in wishlist.")) {
+                throw new ConflictException("You have already added this session to wishlist.");
+            } else if (result.getReason().startsWith("No session found with key")) {
+                throw new NotFoundException(result.getReason());
+            } else {
+                throw new ForbiddenException("Uknown exception.");
+            }
+        }
+        return result;
+    }
+    
+    /**
+     * Delete a session from user's wishlist.
+     * @param user The user who invokes this method. Null when not signed in.
+     * @param websafeSessionKey String representation of Session key.
+     * 
+     * @return WrappedBoolean true if deleted successfully, false otherwise.
+     * 
+     * @throws UnauthorizedException When user is not signed in.
+     * @throws NotFoundException When there is no session with this key.
+     * @throws ForbiddenException
+     * @throws ConflictException When user has no session with this key in their wish list.
+     */
+    @ApiMethod(name="deleteSessionInWishlist",
+            path="session/{websafeSessionKey}/wishlist",
+            httpMethod = HttpMethod.DELETE)
+    public WrappedBoolean deleteSessionInWishlist(final User user,
+            @Named("websafeSessionKey") final String websafeSessionKey) 
+            throws UnauthorizedException, NotFoundException, 
+                ForbiddenException, ConflictException {
+        if (user == null) {
+            throw new UnauthorizedException("Authorization required.");
+        }
+        
+        WrappedBoolean result = ofy().transact(new Work<WrappedBoolean>() {
+            public WrappedBoolean run() {
+                try {
+                    Profile profile = getProfileFromUser(user);
+                    // Check if session with key exists. Throws NotFoundException if it doesn't.
+                    Session session = getSession(websafeSessionKey);
+                    
+                    if (!profile.getSessionKeysWishlist().contains(websafeSessionKey)) {
+                        return new WrappedBoolean(false, "Session not in wishlist.");
+                    } else {
+                        profile.deleteSessionInWishlist(websafeSessionKey);
+                        ofy().save().entity(profile).now();
+                        return new WrappedBoolean(true, "Successfully removed from wishlist.");
+                    }
+                } catch (NotFoundException nfe) {
+                    return new WrappedBoolean(false, "No session with key: " + websafeSessionKey);
+                } catch (Exception e) {
+                    return new WrappedBoolean(false, "Unknown exception.");
+                }
+            }
+        });
+        
+        if (!result.getResult()) {
+            if (result.getReason().equals("Session not in wishlist.")) {
+                throw new ConflictException(result.getReason());
+            } else if (result.getReason().startsWith("No session with key")) {
+                throw new NotFoundException("Session not found.");
+            } else {
+                throw new ForbiddenException("Unknown exception.");
+            }
+        }
+        return result;
+    }
+    
+    /**
+     * Get all sessions from user's wishlist.
+     * @param user The user who invokes this method, null when not signed in.
+     * @return A Collection of sessions that contains user's wishlist sessions.
+     * @throws UnauthorizedException When user is not signed in.
+     * @throws NotFoundException When there is no user with this profile.
+     */
+    @ApiMethod(name="getSessionsInWishlist",
+            path="getSessionsInWishlist",
+            httpMethod = HttpMethod.GET)
+    public Collection<Session> getSessionsInWishlist(final User user) 
+            throws UnauthorizedException, NotFoundException {
+        if (user == null) {
+            throw new UnauthorizedException("Authorization required.");
+        }
+        Profile profile = getProfileFromUser(user);
+        if (profile == null) {
+            throw new NotFoundException("Profile doesn't exist.");
+        }
+        
+        List<String> sessionsKeysWishlist = profile.getSessionKeysWishlist();
+        List<Key<Session>> sessionKeys = new ArrayList<>();
+        
+        for (String keyString : sessionsKeysWishlist) {
+            Key<Session> key = Key.create(keyString);
+            sessionKeys.add(key);
+        }
+        
+        Collection<Session> sessions = ofy().load().keys(sessionKeys).values();
+        return sessions;
     }
     
     /**
@@ -542,6 +689,16 @@ public class ConferenceApi {
      */
     private static String extractDefaultDisplayNameFromEmail(String email) {
         return email == null ? null : email.substring(0, email.indexOf("@"));
+    }
+    
+    private static Session getSession(String websafeSessionKey) 
+        throws NotFoundException {
+        Key<Session> key = Key.create(websafeSessionKey);
+        Session session = ofy().load().key(key).now();
+        if (session == null) {
+            throw new NotFoundException("No conference found with key: " + websafeSessionKey);
+        }
+        return session;
     }
 
 }
