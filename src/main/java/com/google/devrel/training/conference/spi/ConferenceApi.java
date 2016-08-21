@@ -482,7 +482,7 @@ public class ConferenceApi {
     @ApiMethod(name="getSessionsBySpeaker",
             path="getSessionsBySpeaker/{speaker}",
             httpMethod = HttpMethod.POST)
-    public List<Session> getSessionsBySpeaker(@Named("speaker") String speaker) {
+    public List<Session> getSessionsBySpeaker(@Named("speaker") final String speaker) {
         Query<Session> query = ofy().load()
                                     .type(Session.class)
                                     .filter("speaker =", speaker);

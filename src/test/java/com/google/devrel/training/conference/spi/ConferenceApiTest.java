@@ -10,10 +10,13 @@ import com.google.appengine.tools.development.testing.LocalServiceTestHelper;
 import com.google.devrel.training.conference.domain.Conference;
 // import com.google.devrel.training.conference.domain.Conference;
 import com.google.devrel.training.conference.domain.Profile;
+import com.google.devrel.training.conference.domain.Session;
+import com.google.devrel.training.conference.domain.Session.SessionType;
 import com.google.devrel.training.conference.form.ConferenceForm;
 // import com.google.devrel.training.conference.form.ConferenceForm;
 import com.google.devrel.training.conference.form.ProfileForm;
 import com.google.devrel.training.conference.form.ProfileForm.TeeShirtSize;
+import com.google.devrel.training.conference.form.SessionForm;
 import com.googlecode.objectify.Key;
 
 import org.junit.After;
@@ -265,7 +268,6 @@ public class ConferenceApiTest {
         ConferenceForm conferenceForm = new ConferenceForm(
                 NAME, DESCRIPTION, topics, CITY, startDate, endDate, CAP);
         Conference conference = conferenceApi.createConference(user, conferenceForm);
-        Long conferenceId = conference.getId();
 
         // Registration
         Boolean result = conferenceApi.registerForConference(
@@ -288,4 +290,85 @@ public class ConferenceApiTest {
                 profile.getConferenceKeysToAttend().contains(conference.getWebsafeKey()));
     }
     
+    @Test
+    public void testCreateSession() throws Exception {
+        DateFormat dateFormat = new SimpleDateFormat("MM/dd/yyyy");
+        Date startDate = dateFormat.parse("03/25/2014");
+        Date endDate = dateFormat.parse("03/26/2014");
+        ConferenceForm conferenceForm = new ConferenceForm(
+                NAME, DESCRIPTION, new ArrayList<String>(), CITY, startDate, endDate, CAP);
+        Conference conference = conferenceApi.createConference(user, conferenceForm);
+        String conferenceWebsafeKey = conference.getWebsafeKey();
+        
+        String speaker = "Test speaker";
+        SessionForm sessionForm = new SessionForm(speaker, null, null, null, null);
+        Session session = conferenceApi.createSession(user, sessionForm, conferenceWebsafeKey);
+        
+        List<Session> sessions = conferenceApi.getConferenceSessions(conferenceWebsafeKey);
+        assertTrue("Sessions list should contain session.",
+                sessions.contains(session));
+    }
+    
+    @Test
+    public void testQuerySessions() throws Exception {
+        DateFormat dateFormat = new SimpleDateFormat("MM/dd/yyyy");
+        Date startDate = dateFormat.parse("03/25/2014");
+        Date endDate = dateFormat.parse("03/26/2014");
+        ConferenceForm conferenceForm = new ConferenceForm(
+                NAME, DESCRIPTION, new ArrayList<String>(), CITY, startDate, endDate, CAP);
+        Conference conference = conferenceApi.createConference(user, conferenceForm);
+        String conferenceWebsafeKey = conference.getWebsafeKey();
+        
+        String speaker = "Test speaker";
+        SessionType sessionType = SessionType.KEYNOTE;
+        SessionForm sessionForm = new SessionForm(speaker, null, null, sessionType, null);
+        Session session = conferenceApi.createSession(user, sessionForm, conferenceWebsafeKey);
+        
+        List<Session> sesions = conferenceApi.getConferenceSessions(conferenceWebsafeKey);
+        assertEquals(1, sesions.size());
+
+        // Query by speaker.
+        List<Session> sessionsBySpeaker = conferenceApi.getSessionsBySpeaker(speaker);
+        assertTrue("There should be a session with speaker.",
+                sessionsBySpeaker.contains(session));
+        
+        // Query by type.
+        List<Session> sessionByType = conferenceApi.getConferenceSessionsByType(
+                conferenceWebsafeKey, sessionType);
+        assertTrue("There should be a session with type.",
+                sessionByType.contains(session));
+        
+    }
+    
+    @Test
+    public void testSessionWishlist() throws Exception {
+        DateFormat dateFormat = new SimpleDateFormat("MM/dd/yyyy");
+        Date startDate = dateFormat.parse("03/25/2014");
+        Date endDate = dateFormat.parse("03/26/2014");
+        ConferenceForm conferenceForm = new ConferenceForm(
+                NAME, DESCRIPTION, new ArrayList<String>(), CITY, startDate, endDate, CAP);
+        Conference conference = conferenceApi.createConference(user, conferenceForm);
+        
+        String speaker = "Test speaker";
+        SessionForm sessionForm = new SessionForm(speaker, null, null, null, null);
+        Session session = conferenceApi.createSession(user, sessionForm, conference.getWebsafeKey());
+        String sessionWebsafeKey = session.getWebsafeKey();
+        
+        // Add session to wish list.
+        Boolean result = conferenceApi.addSessionToWishList(
+                user, sessionWebsafeKey).getResult();
+        Profile profile = ofy().load().key(Key.create(Profile.class, user.getUserId())).now();
+        assertTrue("addSessionToWishList should succeed", result);
+        assertTrue("Profile should have the session websafe key in wishlist.",
+                profile.getSessionKeysWishlist().contains(sessionWebsafeKey));
+        
+        // Remove from wish list.
+        result = conferenceApi.deleteSessionInWishlist(
+                user, sessionWebsafeKey).getResult();
+        profile = ofy().load().key(Key.create(Profile.class, user.getUserId())).now();
+        assertTrue("deleteSessionInWishlist should succeed", result);
+        assertFalse("Profile should not have the session websafe key in wishlist.",
+                profile.getSessionKeysWishlist().contains(sessionWebsafeKey));
+    }
+        
 }

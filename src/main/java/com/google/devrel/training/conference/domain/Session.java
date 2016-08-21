@@ -97,6 +97,10 @@ public class Session {
         return location;
     }
     
+    public String getWebsafeKey() {
+        return Key.create(conferenceKey, Session.class, id).getString();
+    }
+    
     /**
      * Possible types of a session
      */

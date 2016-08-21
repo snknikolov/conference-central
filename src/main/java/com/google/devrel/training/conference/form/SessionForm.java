@@ -36,5 +36,18 @@ public class SessionForm {
         return location;
     }
 
+    /**
+     * Used for testing purposes only.
+     */
+    public SessionForm(String speaker, Date startTime, 
+            String duration, SessionType type, String location) {
+        this.speaker = speaker;
+        this.startTime = startTime;
+        this.duration = duration;
+        this.type = type;
+        this.location = location;
+    }
+    
+    @SuppressWarnings("unused")
     private SessionForm() {}
 }
