@@ -20,6 +20,17 @@
     </security-constraint>
 <!-- End announcement servlet -->
 
+<!-- Featured speaker servlet -->
+	<servlet>
+		<servlet-name>SetFeaturedSpeakerServlet</servlet-name>
+		<servlet-class>com.google.devrel.training.conference.servlet.SetFeaturedSpeakerServlet</servlet-class>
+	</servlet>
+	<servlet-mapping>
+		<servlet-name>SetFeaturedSpeakerServlet</servlet-name>
+		<url-pattern>/tasks/set_featured_speaker</url-pattern>
+	</servlet-mapping>
+<!-- End featured speaker servlet -->
+
 <!-- Send confirmation servlet -->
 	<servlet>
 		<servlet-name>SendConfirmationEmailServlet</servlet-name>
@@ -29,6 +40,9 @@
 		<servlet-name>SendConfirmationEmailServlet</servlet-name>
 		<url-pattern>/tasks/send_confirmation_email</url-pattern>
 	</servlet-mapping>
+<!-- End confirmation servlet -->
+	
+<!-- Security constraints for tasks -->
 	<security-constraint>
 		<web-resource-collection>
 			<web-resource-name>tasks</web-resource-name>
@@ -38,7 +52,6 @@
 			<role-name>admin</role-name>
 		</auth-constraint>
 	</security-constraint>
-<!-- End confirmation servlet -->
 
     <servlet>
         <servlet-name>SystemServiceServlet</servlet-name>

@@ -33,6 +33,7 @@ import com.google.devrel.training.conference.domain.Conference;
 import com.google.devrel.training.conference.domain.Profile;
 import com.google.devrel.training.conference.domain.Session;
 import com.google.devrel.training.conference.domain.Session.SessionType;
+import com.google.devrel.training.conference.domain.Speaker;
 import com.google.devrel.training.conference.form.ConferenceForm;
 import com.google.devrel.training.conference.form.ConferenceQueryForm;
 import com.google.devrel.training.conference.form.ProfileForm;
@@ -396,18 +397,28 @@ public class ConferenceApi {
             final SessionForm sessionForm, 
             @Named("websafeConferenceKey") final String websafeConferenceKey) 
             throws UnauthorizedException, NotFoundException {
-        Conference conference = getConference(websafeConferenceKey);
+        final Conference conference = getConference(websafeConferenceKey);
         if (user == null || !user.getUserId().equals(conference.getOrganizerUserId())) {
             throw new UnauthorizedException("Authorization required.");
         }
         
         final long conferenceId = conference.getId();
         final Key<Conference> conferenceKey = Key.create(Conference.class, conferenceId);
-        
         final Key<Session> sessionKey = factory().allocateId(conferenceKey, Session.class);
-        Session session = new Session(sessionKey.getId(), conferenceId, sessionForm);
-        ofy().save().entities(conference, session).now();
-        
+        final Queue queue = QueueFactory.getDefaultQueue();
+
+        Session session = ofy().transact(new Work<Session>() {
+            public Session run() {
+                Session session = new Session(sessionKey.getId(), conferenceId, sessionForm);
+                ofy().save().entities(conference, session).now();
+                
+                // Add get featured speakers to push queue.
+                queue.add(ofy().getTransaction(), TaskOptions.Builder
+                                    .withUrl("/tasks/set_featured_speaker")
+                                    .param("speaker", session.getSpeaker()));
+                return session;
+            }
+        });        
         return session;
     }
         
@@ -635,6 +646,17 @@ public class ConferenceApi {
         
         return announcement == null ? 
                 null : new Announcement(announcement.toString());
+    }
+    
+    /**
+     * Get featured speaker from memcache (if any).
+     * A featured speaker is a speaker who has more than one session for a given conference.
+     */
+    @ApiMethod(name="getFeaturedSpeaker", path="featuredSpeaker", httpMethod=HttpMethod.GET)
+    public Speaker getSpeaker() {
+        MemcacheService memcacheService = MemcacheServiceFactory.getMemcacheService();
+        Object speaker = memcacheService.get(Constants.MEMCACHE_FEATURED_SPEAKER_KEY);
+        return speaker == null ? null : new Speaker(speaker.toString());
     }
         
     /**
